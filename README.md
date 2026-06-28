@@ -139,7 +139,7 @@ meeting-agent/
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/meeting-agent.git
+git clone https://github.com/joel-ruetas/meeting-agent.git
 cd meeting-agent
 
 # Create and activate virtual environment
