@@ -1,0 +1,27 @@
+Team Sync — June 27, 2026
+Attendees: Sarah Chen, Marcus Williams, Priya Patel, Tom Rodriguez
+
+Sarah: Okay let's get started. We need to finalize the Q3 roadmap.
+
+Marcus: I can have the draft ready by next Friday. I'll share it in Slack.
+
+Priya: Good. I also need someone to review the vendor contracts.
+
+Tom: I'll take that. I can get through them by end of next week.
+
+Sarah: Perfect. Priya, can you set up the kickoff meeting for the new project?
+
+Priya: Yes, I'll send out calendar invites by Wednesday.
+
+Sarah: Tom, one more thing — can you update the dashboard with the new metrics?
+
+Tom: Sure, I'll have that done by Monday.
+
+Sarah: Great. Let's also make sure we document the decision to move the launch 
+to August. That was agreed by everyone on last week's call.
+
+Marcus: Agreed. I'll add that to the decision log today.
+
+Sarah: Perfect. I think that covers everything. Same time next week?
+
+Everyone: Sounds good.
