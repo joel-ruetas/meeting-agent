@@ -501,18 +501,20 @@ Alice: Great. I'll set up the review meeting for Thursday.
 def llm_judge(output, criteria):
     """Use the LLM itself to judge whether output meets criteria."""
     try:
-        import google.generativeai as genai
+        from google import genai
         key = os.getenv("GEMINI_API_KEY")
         if not key:
             return None, "No API key"
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        client = genai.Client(api_key=key)
         prompt = (
             f"You are an evaluator. Answer only YES or NO.\n\n"
             f"Output to evaluate:\n{output}\n\n"
             f"Question: {criteria}\n\nAnswer (YES or NO only):"
         )
-        resp = model.generate_content(prompt)
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
         answer = resp.text.strip().upper()
         return "YES" in answer, answer
     except Exception as e:
@@ -539,7 +541,7 @@ async def run_agent_on_transcript(transcript):
                 text=f"Process this meeting transcript:\n\n{transcript}"
             )]
         )
-        response = ""
+        by_author = {}
         async for event in runner.run_async(
             user_id="eval_user",
             session_id=session.id,
@@ -548,20 +550,23 @@ async def run_agent_on_transcript(transcript):
             if event.content and event.content.parts:
                 for part in event.content.parts:
                     if hasattr(part, "text") and part.text:
-                        response += part.text
-        return response
+                        a = event.author or "agent"
+                        by_author[a] = by_author.get(a, "") + part.text
+        if "summary_agent" in by_author:
+            return by_author["summary_agent"]
+        return "".join(by_author.values())
     except Exception as e:
         # Fallback to direct Gemini
         try:
-            import google.generativeai as genai
+            from google import genai
             key = os.getenv("GEMINI_API_KEY")
             if not key:
                 return f"ERROR: No GEMINI_API_KEY"
-            genai.configure(api_key=key)
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            client = genai.Client(api_key=key)
             from app.agent import FULL_INSTRUCTION
-            resp = model.generate_content(
-                f"{FULL_INSTRUCTION}\n\nTRANSCRIPT:\n{transcript}"
+            resp = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=f"{FULL_INSTRUCTION}\n\nTRANSCRIPT:\n{transcript}",
             )
             return resp.text
         except Exception as e2:

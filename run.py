@@ -125,7 +125,10 @@ async def run_with_adk(clean_text: str, filename: str) -> str:
             parts=[types.Part(text=prompt)]
         )
 
-        full_response = ""
+        # Collect text per author. In the multi-agent pipeline only the final
+        # summary_agent output is the deliverable — the structure/sentiment/
+        # action agents emit intermediate JSON we don't want in the summary.
+        by_author = {}
         async for event in runner.run_async(
             user_id="user",
             session_id=session.id,
@@ -134,9 +137,12 @@ async def run_with_adk(clean_text: str, filename: str) -> str:
             if event.content and event.content.parts:
                 for part in event.content.parts:
                     if hasattr(part, 'text') and part.text:
-                        full_response += part.text
+                        author = event.author or "agent"
+                        by_author[author] = by_author.get(author, "") + part.text
 
-        return full_response
+        if "summary_agent" in by_author:
+            return by_author["summary_agent"]
+        return "".join(by_author.values())
 
     except Exception as e:
         print(f"ADK runner error: {e}")
@@ -146,19 +152,21 @@ async def run_with_adk(clean_text: str, filename: str) -> str:
 async def direct_gemini_call(transcript_text: str) -> str:
     """Fallback: calls Gemini directly without ADK."""
     try:
-        import google.generativeai as genai
+        from google import genai
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             print("No GEMINI_API_KEY in .env file")
             return ""
 
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        client = genai.Client(api_key=api_key)
 
-        from app.agent import AGENT_INSTRUCTION
-        prompt = f"{AGENT_INSTRUCTION}\n\nTRANSCRIPT:\n{transcript_text}"
+        from app.agent import FULL_INSTRUCTION
+        prompt = f"{FULL_INSTRUCTION}\n\nTRANSCRIPT:\n{transcript_text}"
 
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
         return response.text
 
     except Exception as e:

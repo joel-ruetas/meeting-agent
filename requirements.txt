@@ -1,0 +1,10 @@
+# Meeting Intelligence Agent — Python dependencies
+# Install with:  pip install -r requirements.txt
+
+google-adk==2.3.0          # multi-agent orchestration (SequentialAgent) + runner
+google-genai==2.10.0       # Gemini SDK (new unified client; replaces google-generativeai)
+litellm==1.90.0            # Claude / multi-provider model routing for ADK LiteLlm
+mcp==1.28.1                # Model Context Protocol server (sandboxed file I/O)
+python-dotenv==1.2.2       # loads API keys from .env
+streamlit>=1.40,<2         # web UI (web_app.py)
+pandas>=2.0,<3             # action-item tables in the web UI

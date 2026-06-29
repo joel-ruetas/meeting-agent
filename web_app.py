@@ -570,7 +570,10 @@ with tab1:
                             text=f"Process this meeting transcript:\n\n{text}"
                         )]
                     )
-                    response = ""
+                    # Keep only the final summary_agent output from the
+                    # multi-agent pipeline (intermediate JSON from the other
+                    # specialists is not part of the deliverable).
+                    by_author = {}
                     async for event in runner.run_async(
                         user_id="web_user",
                         session_id=session.id,
@@ -579,19 +582,22 @@ with tab1:
                         if event.content and event.content.parts:
                             for part in event.content.parts:
                                 if hasattr(part, "text") and part.text:
-                                    response += part.text
-                    return response
+                                    a = event.author or "agent"
+                                    by_author[a] = by_author.get(a, "") + part.text
+                    if "summary_agent" in by_author:
+                        return by_author["summary_agent"]
+                    return "".join(by_author.values())
                 except Exception:
                     try:
-                        import google.generativeai as genai
+                        from google import genai
                         key = os.getenv("GEMINI_API_KEY")
                         if not key:
                             return "ERROR: No GEMINI_API_KEY in .env"
-                        genai.configure(api_key=key)
-                        m = genai.GenerativeModel("gemini-2.5-flash")
+                        client = genai.Client(api_key=key)
                         from app.agent import FULL_INSTRUCTION
-                        r = m.generate_content(
-                            f"{FULL_INSTRUCTION}\n\nTRANSCRIPT:\n{text}"
+                        r = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=f"{FULL_INSTRUCTION}\n\nTRANSCRIPT:\n{text}",
                         )
                         return r.text
                     except Exception as e2:
@@ -807,7 +813,7 @@ with tab3:
         # Concepts table
         concepts = [
             ("account_tree",        "Multi-agent system (ADK)",
-             "4 specialist agents in a Workflow graph"),
+             "4 specialist agents in a SequentialAgent pipeline"),
             ("electrical_services", "MCP Server",
              "FastMCP server for sandboxed file I/O"),
             ("security",            "Security features",

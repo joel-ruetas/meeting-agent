@@ -33,7 +33,7 @@ transcript into a structured, actionable output in seconds.
 
 | Concept | Implementation |
 |---------|----------------|
-| **Multi-agent system (ADK 2.0)** | Orchestrator → Structure Agent → Sentiment Agent → Action Extractor → Summary Writer |
+| **Multi-agent system (ADK)** | `SequentialAgent` pipeline: Structure Agent → Sentiment Agent → Action Extractor → Summary Writer |
 | **MCP Server** | Custom FastMCP server for sandboxed file I/O |
 | **Security features** | PII scrubber + prompt injection detection + Human-in-the-Loop approval gate |
 | **Agent Skill** | `SKILL.md` loaded on demand — no context bloat |
@@ -148,7 +148,7 @@ python -m venv .venv
 source .venv/bin/activate     # Mac/Linux
 
 # Install dependencies
-pip install google-adk mcp python-dotenv litellm streamlit pandas google-generativeai
+pip install -r requirements.txt
 ```
 
 ### Configure
