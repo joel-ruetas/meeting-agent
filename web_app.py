@@ -720,7 +720,7 @@ with tab1:
                     unsafe_allow_html=True)
             with m2:
                 st.markdown(
-                    metric_card(cal_events, "Calendar Events", "event"),
+                    metric_card(cal_events, "Events", "event"),
                     unsafe_allow_html=True)
             with m3:
                 st.markdown(
