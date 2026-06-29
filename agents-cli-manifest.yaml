@@ -1,0 +1,62 @@
+# agents-cli-manifest.yaml
+# Top-level manifest that agents-cli reads to discover, run, and deploy this
+# project. Keep it at the repo root so the CLI finds it automatically.
+
+# Identity used by the CLI and the agent registry. `version` should be bumped
+# on each release so deployments and rollbacks are traceable.
+name: meeting-intelligence-agent
+version: 1.0.0
+
+# Shown in the playground/registry UI. Lead with what it does and the key
+# differentiator (human-in-the-loop approval).
+description: >
+  A secure multi-agent AI pipeline that transforms meeting transcripts
+  into structured summaries, prioritized action items, and calendar
+  reminders — with human approval built in at every step.
+
+# Entry point: the CLI imports `module` and looks for the object named `app`.
+# Here that resolves to the `app` instance exported from app/agent.py.
+agent:
+  module: app.agent
+  app: app
+
+# Skills are reusable instruction/prompt bundles the agent can invoke.
+# Each `path` points to a SKILL.md describing one capability.
+skills:
+  - path: .agents/skills/meeting-summary/SKILL.md
+
+# System-wide behavioral rules applied to every run (tone, guardrails,
+# approval policy). Shared across all agents in the project.
+rules: .agents/AGENTS.md
+
+# MCP servers the agent can call as tools. Each entry is launched as a
+# subprocess; this one exposes scoped filesystem access for reading
+# transcripts and writing summaries.
+mcp_servers:
+  - name: meeting-filesystem
+    command: python
+    args:
+      - mcp_server/filesystem_server.py
+
+# Secrets and config loaded into the agent's environment at runtime.
+# Keep .env out of version control (see .gitignore).
+env_file: .env
+
+# Ready-to-run examples that prefill the playground so anyone can try the
+# agent without crafting input. Each `input` is sent verbatim as the prompt.
+samples:
+  - name: Sample Meeting Transcript
+    input: >
+      Please process this meeting transcript:
+
+      Team Sync — June 27, 2026
+      Attendees: Sarah Chen, Marcus Williams, Priya Patel, Tom Rodriguez
+
+      Sarah: Okay let's get started. We need to finalize the Q3 roadmap.
+      Marcus: I can have the draft ready by next Friday.
+      Priya: Good. I also need someone to review the vendor contracts.
+      Tom: I'll take that. I can get through them by end of next week.
+      Sarah: Perfect. Priya, can you set up the kickoff meeting?
+      Priya: Yes, I'll send out calendar invites by Wednesday.
+      Tom: I'll update the dashboard with the new metrics by Monday.
+      Marcus: I'll add the August launch decision to the decision log today.
