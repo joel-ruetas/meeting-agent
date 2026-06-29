@@ -87,11 +87,33 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# ── Markdown scaling CSS (separate block — no f-string, no theme variables) ──
+st.markdown("""
+<style>
+.stMarkdown h1 { font-size: 18px !important; font-weight: 700 !important; margin-bottom: 6px !important; margin-top: 8px !important; }
+.stMarkdown h2 { font-size: 15px !important; font-weight: 600 !important; margin-bottom: 4px !important; margin-top: 12px !important; }
+.stMarkdown h3 { font-size: 13px !important; font-weight: 600 !important; margin-bottom: 4px !important; margin-top: 10px !important; }
+.stMarkdown p, .stMarkdown li { font-size: 13px !important; line-height: 1.6 !important; }
+.stMarkdown table { font-size: 12px !important; width: 100% !important; }
+.stMarkdown th { font-size: 11px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; padding: 6px 8px !important; }
+.stMarkdown td { font-size: 12px !important; padding: 5px 8px !important; }
+.stMarkdown em { font-size: 11px !important; color: #94A3B8 !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <style>
 #MainMenu, footer {{ visibility: hidden; }}
-.stApp {{ background: {BG} !important; }}
+/* Own the base text color here — config.toml's textColor only applies at
+   server start, not on rerun, so a live theme toggle must set color in CSS. */
+.stApp {{ background: {BG} !important; color: {TEXT} !important; }}
+/* Default text rendered by Streamlit (markdown body, plain text, widget
+   content) inherits from .stApp above. Custom HTML keeps its inline colors. */
+.stApp [data-testid="stText"], .stApp [data-testid="stText"] pre,
+.stApp .stMarkdown, .stApp .stHeading, .stApp [data-testid="stWidgetLabel"] {{
+    color: {TEXT} !important;
+}}
 .stButton > button[kind="primary"] {{
     background: linear-gradient(135deg, {PRIMARY}, {ACCENT}) !important;
     border: none !important; color: white !important;
@@ -156,6 +178,52 @@ div[data-testid="stRadio"] div[role="radio"] + div {{
     border: 1.5px solid {PRIMARY} !important;
     color: {PRIMARY} !important; border-radius: 8px !important;
     font-weight: 600 !important;
+}}
+
+.stMarkdown h1 {{
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: inherit !important;
+    margin-bottom: 6px !important;
+    margin-top: 8px !important;
+}}
+.stMarkdown h2 {{
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: inherit !important;
+    margin-bottom: 4px !important;
+    margin-top: 12px !important;
+}}
+.stMarkdown h3 {{
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: inherit !important;
+    margin-bottom: 4px !important;
+    margin-top: 10px !important;
+}}
+.stMarkdown p, .stMarkdown li {{
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    color: inherit !important;
+}}
+.stMarkdown table {{
+    font-size: 12px !important;
+    width: 100% !important;
+}}
+.stMarkdown th {{
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 6px 8px !important;
+}}
+.stMarkdown td {{
+    font-size: 12px !important;
+    padding: 5px 8px !important;
+}}
+.stMarkdown em {{
+    font-size: 11px !important;
+    color: #94A3B8 !important;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -627,6 +695,7 @@ with tab1:
                     "filename": filename,
                     "redacted": redacted,
                     "ready":    True,
+                    "approved": False,
                 })
 
         if st.session_state.get("ready"):
@@ -690,28 +759,34 @@ with tab1:
                         summary, encoding="utf-8")
                     (out / f"{fname}.ics").write_text(
                         calendar, encoding="utf-8")
-                    st.success("Saved to outputs/ folder")
-                    d1, d2 = st.columns(2)
-                    with d1:
-                        st.download_button(
-                            "DOWNLOAD SUMMARY", summary,
-                            file_name=f"{fname}_summary.txt",
-                            mime="text/plain",
-                            use_container_width=True
-                        )
-                    with d2:
-                        st.download_button(
-                            "DOWNLOAD CALENDAR", calendar,
-                            file_name=f"{fname}.ics",
-                            mime="text/calendar",
-                            use_container_width=True
-                        )
-                    st.session_state["ready"] = False
+                    st.session_state["approved"] = True
             with c2:
                 if st.button("REJECT & DISCARD",
                              use_container_width=True, key="reject"):
                     st.info("Discarded — no files saved.")
                     st.session_state["ready"] = False
+                    st.session_state["approved"] = False
+
+            # Render the save confirmation + downloads OUTSIDE the approve
+            # button's if-block so they survive the rerun a download click
+            # triggers (Streamlit reruns the whole script on every click).
+            if st.session_state.get("approved"):
+                st.success("Saved to outputs/ folder")
+                d1, d2 = st.columns(2)
+                with d1:
+                    st.download_button(
+                        "DOWNLOAD SUMMARY", summary,
+                        file_name=f"{fname}_summary.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+                with d2:
+                    st.download_button(
+                        "DOWNLOAD CALENDAR", calendar,
+                        file_name=f"{fname}.ics",
+                        mime="text/calendar",
+                        use_container_width=True
+                    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -787,7 +862,16 @@ with tab2:
                     pass
 
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        st.text_area("Full summary", summary, height=280, disabled=True)
+        st.markdown(
+            f'''<div style="background:{SURFACE};border-radius:12px;
+            box-shadow:{CARD_SH};padding:20px 24px;margin-top:8px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;
+            text-transform:uppercase;color:{TEXT3};margin-bottom:12px;">
+            Full Summary</div>''',
+            unsafe_allow_html=True
+        )
+        st.markdown(summary)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     else:
         st.markdown(
