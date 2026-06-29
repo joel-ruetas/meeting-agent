@@ -106,8 +106,14 @@ meeting-agent/
 ├── README.md                          ← this file
 ├── run.py                             ← terminal runner
 ├── web_app.py                         ← Streamlit web UI
+├── requirements.txt                   ← Python dependencies
+├── agents-cli-manifest.yaml           ← agents-cli discovery/run/deploy manifest
+├── AGENTS.md                          ← Claude Code project instructions
+├── LICENSE                            ← MIT license
 ├── .env.example                       ← template (copy to .env and add keys)
 ├── .gitignore                         ← keeps secrets out of GitHub
+├── .streamlit/
+│   └── config.toml                    ← Streamlit theme/UI config
 ├── app/
 │   ├── agent.py                       ← ADK multi-agent workflow
 │   └── security.py                    ← PII scrubber + injection detector
@@ -115,10 +121,10 @@ meeting-agent/
 │   └── filesystem_server.py           ← FastMCP file I/O server
 ├── transcripts/
 │   └── sample_meeting.txt             ← sample transcript for testing
-├── outputs/                           ← generated summaries and .ics files
+├── outputs/                           ← generated summaries and .ics files (gitignored)
 │   └── eval_report.json               ← evaluation test results
 ├── tests/
-│   └── eval.py                        ← 90-test evaluation suite
+│   └── eval.py                        ← 91-test evaluation suite
 └── .agents/
     ├── AGENTS.md                      ← agent rules and conventions
     └── skills/
@@ -236,7 +242,7 @@ calendar app (Google Calendar, Outlook, Apple Calendar).
 
 ## Evaluation Results
 
-The project includes a 90-test evaluation suite covering:
+The project includes a 91-test evaluation suite covering:
 - PII scrubbing (10 tests)
 - Prompt injection detection (10 tests)
 - ICS calendar file validation (11 tests)
@@ -244,10 +250,12 @@ The project includes a 90-test evaluation suite covering:
 - MCP file safety and path traversal (7 tests)
 - Security edge cases (10 tests)
 - Environment and configuration checks (12 tests)
-- LLM integration with LLM-as-judge scoring (7 tests)
+- LLM integration with LLM-as-judge scoring (8 tests)
 - Regression tests for edge cases (8 tests)
 
-**Score: 100% passing (quick mode) / 93%+ with LLM tests**
+**Score: 100% of executed tests passing.** The 3 LLM-as-judge tests are
+skipped automatically when the Gemini free-tier quota is exhausted (run
+`--quick` to skip all live LLM calls).
 
 ---
 
