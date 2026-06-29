@@ -10,7 +10,7 @@ It processes meeting transcripts and extracts action items.
 - mcp_server/filesystem_server.py — FastMCP file server
 - web_app.py — Streamlit web interface
 - run.py — terminal runner
-- tests/eval.py — 90-test evaluation suite
+- tests/eval.py — 91-test evaluation suite
 
 ## Rules Claude Code must follow
 - Never hardcode API keys — always use .env
