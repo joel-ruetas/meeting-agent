@@ -40,8 +40,8 @@ if dark:
     SURFACE    = "#1E293B"
     BORDER     = "#334155"
     TEXT       = "#F1F5F9"
-    TEXT2      = "#94A3B8"
-    TEXT3      = "#475569"
+    TEXT2      = "#A9B6CC"
+    TEXT3      = "#8B98AD"
     ICON_BG    = "#263548"
     CARD_SH    = "0 1px 3px rgba(0,0,0,0.4),0 4px 12px rgba(0,0,0,0.3)"
     CODE_BG    = "#020817"
@@ -50,8 +50,8 @@ else:
     SURFACE    = "#FFFFFF"
     BORDER     = "#E2E8F0"
     TEXT       = "#1E293B"
-    TEXT2      = "#64748B"
-    TEXT3      = "#94A3B8"
+    TEXT2      = "#586374"
+    TEXT3      = "#6B7688"
     ICON_BG    = "#EEF2FF"
     CARD_SH    = "0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04)"
     CODE_BG    = "#0F172A"
@@ -148,6 +148,40 @@ st.markdown(f"""
 .stTextArea textarea, .stTextInput input {{
     border-radius: 8px !important; border: 1.5px solid {BORDER} !important;
     background: {SURFACE} !important; color: {TEXT} !important;
+}}
+/* Dim-but-legible placeholder in both themes. */
+.stTextArea textarea::placeholder, .stTextInput input::placeholder {{
+    color: {TEXT3} !important; opacity: 1 !important;
+}}
+/* Plain-text blocks (transcript preview / sample) — give them an explicit
+   surface, border and foreground so the content reads clearly in both
+   themes instead of inheriting an unstyled, low-contrast box. */
+.stApp [data-testid="stText"] {{
+    background: {BG} !important;
+    border: 1px solid {BORDER} !important;
+    border-radius: 8px !important;
+    padding: 12px 14px !important;
+}}
+.stApp [data-testid="stText"], .stApp [data-testid="stText"] pre {{
+    color: {TEXT} !important; white-space: pre-wrap !important;
+}}
+/* Expander shell + body match the card surface so previews sit cleanly. */
+.stExpander {{
+    border: 1px solid {BORDER} !important;
+    border-radius: 10px !important;
+    background: {SURFACE} !important;
+}}
+.stExpander [data-testid="stExpanderDetails"] {{ color: {TEXT} !important; }}
+/* Expander header ("View sample" / "Preview"): force it onto the card
+   surface so its text isn't light-on-light in dark mode. */
+.stExpander summary, .stExpander details > summary {{
+    background: {SURFACE} !important;
+    color: {TEXT} !important;
+    border-radius: 10px !important;
+}}
+.stExpander summary p, .stExpander summary span,
+.stExpander summary svg {{
+    color: {TEXT} !important; fill: {TEXT} !important;
 }}
 .stRadio label, div[data-testid="stRadio"] label {{
     color: {TEXT} !important;
@@ -255,13 +289,22 @@ def section_label(text):
             f'{text}</div>')
 
 def metric_card(value, title, icon_name):
+    # Fixed min-height + flex centering so all three cards stay the same height
+    # regardless of whether the title wraps to one or two lines (e.g. "ACTION
+    # ITEMS" vs "WORDS"). The title sits in its own fixed-height row so the
+    # value below it always aligns across cards.
     return (f'<div style="background:{SURFACE};border-radius:12px;'
-            f'box-shadow:{CARD_SH};padding:20px;text-align:center;'
-            f'border-top:3px solid {PRIMARY};">'
+            f'box-shadow:{CARD_SH};padding:18px 14px;text-align:center;'
+            f'border-top:3px solid {PRIMARY};min-height:132px;box-sizing:border-box;'
+            f'display:flex;flex-direction:column;align-items:center;'
+            f'justify-content:center;gap:6px;">'
             f'<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;'
-            f'text-transform:uppercase;color:{TEXT3};margin-bottom:8px;">'
+            f'text-transform:uppercase;color:{TEXT3};line-height:1.3;'
+            f'min-height:30px;display:flex;align-items:center;'
+            f'justify-content:center;">'
             f'{mi(icon_name,PRIMARY,"15px")}&nbsp;{title}</div>'
-            f'<div style="font-size:40px;font-weight:300;color:{PRIMARY};">'
+            f'<div style="font-size:40px;font-weight:300;color:{PRIMARY};'
+            f'line-height:1;">'
             f'{value}</div></div>')
 
 def pipeline_row(ic, color, title, desc):
@@ -485,28 +528,49 @@ with tab1:
             unsafe_allow_html=True
         )
 
+        # Widgets inside st.tabs() lose their state on a rerun triggered from
+        # outside the tab (e.g. the light/dark toggle in the sidebar) — even
+        # with an explicit key. To keep the selected method across those
+        # reruns, drive the radio's default from a plain session_state mirror
+        # via index=, then write the current choice back.
+        _METHODS = ["Paste text", "Upload file", "Use sample"]
+        if "method_choice" not in st.session_state:
+            st.session_state["method_choice"] = _METHODS[0]
         method = st.radio(
             "Method",
-            ["Paste text", "Upload file", "Use sample"],
+            _METHODS,
+            index=_METHODS.index(st.session_state["method_choice"]),
             horizontal=True,
             label_visibility="collapsed"
         )
+        st.session_state["method_choice"] = method
 
         transcript_text = ""
         filename = "meeting"
 
         if method == "Paste text":
+            # Same tab-rerun state-loss applies to these inputs — mirror their
+            # values through plain session_state and seed via value= so a theme
+            # toggle doesn't wipe what was typed.
+            if "paste_text" not in st.session_state:
+                st.session_state["paste_text"] = ""
+            if "paste_name" not in st.session_state:
+                st.session_state["paste_name"] = "my_meeting"
             transcript_text = st.text_area(
                 "Transcript", height=250,
+                value=st.session_state["paste_text"],
                 placeholder="Team Sync — June 27, 2026\n"
                             "Attendees: Sarah, Marcus...\n\n"
                             "Sarah: Let's get started...",
                 label_visibility="collapsed"
             )
+            st.session_state["paste_text"] = transcript_text
             filename = st.text_input(
-                "filename", value="my_meeting",
+                "filename",
+                value=st.session_state["paste_name"],
                 label_visibility="collapsed"
             )
+            st.session_state["paste_name"] = filename
             st.caption("Meeting name — used for output filenames")
 
         elif method == "Upload file":
@@ -514,13 +578,29 @@ with tab1:
                 "Upload", type=["txt", "md"],
                 label_visibility="collapsed"
             )
-            if uploaded:
+            if uploaded is not None:
+                # Fresh upload: decode and cache the contents. st.file_uploader
+                # loses its file on a tab-external rerun (e.g. the light/dark
+                # toggle) and — unlike a text input — can't be re-seeded with a
+                # value, so we keep the decoded text in session_state and fall
+                # back to it below when the widget comes back empty.
                 transcript_text = uploaded.read().decode("utf-8")
                 filename = (uploaded.name
                             .replace(".txt","").replace(".md",""))
+                st.session_state["upload_text"]  = transcript_text
+                st.session_state["upload_name"]  = filename
+                st.session_state["upload_label"] = uploaded.name
+            elif "upload_text" in st.session_state:
+                # Widget was reset by an external rerun — restore the cached
+                # file so the upload survives the toggle.
+                transcript_text = st.session_state["upload_text"]
+                filename = st.session_state["upload_name"]
+            if transcript_text:
                 st.markdown(
                     icon_row("check_circle",
-                             f"Loaded: {uploaded.name}", SUCCESS),
+                             f"Loaded: "
+                             f"{st.session_state.get('upload_label', filename)}",
+                             SUCCESS),
                     unsafe_allow_html=True
                 )
                 with st.expander("Preview"):
@@ -543,6 +623,17 @@ with tab1:
                              ERROR),
                     unsafe_allow_html=True
                 )
+
+        # Clear any previously generated results when the input changes — a new
+        # paste, a newly uploaded file, or switching to the sample all
+        # invalidate the old summary/calendar. transcript_text is now stable
+        # across a light/dark toggle (inputs are mirrored through
+        # session_state), so this comparison never fires on a theme switch and
+        # results survive toggling.
+        if st.session_state.get("source_text") != transcript_text:
+            st.session_state["source_text"] = transcript_text
+            for _k in ("summary", "calendar", "ready", "approved", "redacted"):
+                st.session_state.pop(_k, None)
 
         if transcript_text:
             injection = check_prompt_injection(transcript_text)
