@@ -42,6 +42,34 @@ except ImportError:
     ADK_WORKFLOW = False
     print("ADK SequentialAgent not available, using single agent")
 
+# Deterministic generation: temperature 0 keeps the agents' output stable
+# across runs. This makes the summary/action-item extraction reproducible,
+# which in turn keeps the LLM eval suite from flaking on sampling variance.
+# temperature=0 keeps the agents' output focused and consistent in every
+# context. gemini-2.5-flash's "thinking" step is non-deterministic even at
+# temperature 0 and compounds across the 4-agent pipeline, so for reproducible
+# evaluation we additionally disable it — but ONLY when MEETING_AGENT_DETERMINISTIC
+# is set (the eval suite sets it). Normal production runs keep thinking on for
+# richer output.
+_DETERMINISTIC = os.getenv("MEETING_AGENT_DETERMINISTIC", "").lower() in (
+    "1", "true", "yes", "on"
+)
+try:
+    from google.genai import types
+    if _DETERMINISTIC:
+        try:
+            GEN_CONFIG = types.GenerateContentConfig(
+                temperature=0.0,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            )
+        except Exception:
+            # Older SDK without ThinkingConfig — fall back to temperature only.
+            GEN_CONFIG = types.GenerateContentConfig(temperature=0.0)
+    else:
+        GEN_CONFIG = types.GenerateContentConfig(temperature=0.0)
+except Exception:
+    GEN_CONFIG = None
+
 # ── Security node (pure Python, zero LLM cost) ───────────────────────────────
 def security_node(transcript: str) -> dict:
     """
@@ -65,6 +93,7 @@ def security_node(transcript: str) -> dict:
 structure_agent = Agent(
     name="structure_agent",
     model=MODEL,
+    generate_content_config=GEN_CONFIG,
     instruction="""You extract the structure of a meeting transcript.
     
     Return a JSON object with exactly these keys:
@@ -78,6 +107,7 @@ structure_agent = Agent(
 sentiment_agent = Agent(
     name="sentiment_agent",
     model=MODEL,
+    generate_content_config=GEN_CONFIG,
     instruction="""You analyze the tone and sentiment of a meeting transcript.
     
     Return a JSON object with exactly these keys:
@@ -92,6 +122,7 @@ sentiment_agent = Agent(
 action_agent = Agent(
     name="action_agent",
     model=MODEL,
+    generate_content_config=GEN_CONFIG,
     instruction="""You extract action items from a meeting transcript.
     
     For each action item return a JSON array where each item has:
@@ -112,6 +143,7 @@ action_agent = Agent(
 summary_agent = Agent(
     name="summary_agent",
     model=MODEL,
+    generate_content_config=GEN_CONFIG,
     instruction="""You write a professional meeting summary.
 
     You receive structured data about a meeting. Write a summary in this format:
@@ -252,5 +284,6 @@ if not ADK_WORKFLOW:
     app = Agent(
         name="meeting_intelligence_agent",
         model=MODEL,
+        generate_content_config=GEN_CONFIG,
         instruction=FULL_INSTRUCTION,
     )

@@ -21,6 +21,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
 
+# Run the agent deterministically for evaluation: this flag tells app.agent to
+# disable the model's (non-deterministic) thinking step so results are
+# reproducible across runs. Production code paths leave it unset and keep
+# thinking on. Must be set before app.agent is imported (done lazily below).
+os.environ["MEETING_AGENT_DETERMINISTIC"] = "1"
+
 from app.security import scrub_pii, check_prompt_injection
 
 # ── ANSI colors for terminal output ──────────────────────────────────────────
@@ -498,27 +504,55 @@ Bob: Yes, I'll get that done.
 Alice: Great. I'll set up the review meeting for Thursday.
 """
 
-def llm_judge(output, criteria):
-    """Use the LLM itself to judge whether output meets criteria."""
+def _gen_config(types):
+    """Deterministic generation config: temperature 0 + thinking disabled.
+
+    gemini-2.5-flash's default "thinking" is non-deterministic even at
+    temperature 0, so disabling it is what actually stabilises both the agent
+    output and the judge's verdict. Falls back gracefully on older SDKs.
+    """
     try:
-        from google import genai
-        key = os.getenv("GEMINI_API_KEY")
-        if not key:
-            return None, "No API key"
-        client = genai.Client(api_key=key)
-        prompt = (
-            f"You are an evaluator. Answer only YES or NO.\n\n"
-            f"Output to evaluate:\n{output}\n\n"
-            f"Question: {criteria}\n\nAnswer (YES or NO only):"
+        return types.GenerateContentConfig(
+            temperature=0.0,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
-        resp = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        answer = resp.text.strip().upper()
-        return "YES" in answer, answer
-    except Exception as e:
-        return None, str(e)
+    except Exception:
+        return types.GenerateContentConfig(temperature=0.0)
+
+
+def llm_judge(output, criteria, attempts=3):
+    """Use the LLM itself to judge whether output meets criteria.
+
+    Runs at temperature 0 for a stable verdict and retries a few times so a
+    transient API hiccup doesn't fail the test outright. Returns
+    (bool | None, answer); None means the judge was genuinely unavailable.
+    """
+    from google import genai
+    from google.genai import types
+    key = os.getenv("GEMINI_API_KEY")
+    if not key:
+        return None, "No API key"
+    prompt = (
+        f"You are an evaluator. Answer only YES or NO.\n\n"
+        f"Output to evaluate:\n{output}\n\n"
+        f"Question: {criteria}\n\nAnswer (YES or NO only):"
+    )
+    last_err = ""
+    for _ in range(attempts):
+        try:
+            client = genai.Client(api_key=key)
+            resp = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=_gen_config(types),
+            )
+            answer = (resp.text or "").strip().upper()
+            if "YES" in answer or "NO" in answer:
+                return "YES" in answer, answer
+            last_err = f"unparseable answer: {answer!r}"
+        except Exception as e:
+            last_err = str(e)
+    return None, last_err
 
 async def run_agent_on_transcript(transcript):
     """Run the full agent pipeline on a transcript."""
@@ -559,6 +593,7 @@ async def run_agent_on_transcript(transcript):
         # Fallback to direct Gemini
         try:
             from google import genai
+            from google.genai import types
             key = os.getenv("GEMINI_API_KEY")
             if not key:
                 return f"ERROR: No GEMINI_API_KEY"
@@ -567,6 +602,7 @@ async def run_agent_on_transcript(transcript):
             resp = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=f"{FULL_INSTRUCTION}\n\nTRANSCRIPT:\n{transcript}",
+                config=_gen_config(types),
             )
             return resp.text
         except Exception as e2:
