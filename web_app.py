@@ -8,6 +8,7 @@ security checks, and summary/calendar artifact generation.
 # streamlit run web_app.py
 
 import streamlit as st
+import streamlit.components.v1 as components
 import asyncio
 import pathlib
 import os
@@ -565,6 +566,28 @@ with tab1:
                 label_visibility="collapsed"
             )
             st.session_state["paste_text"] = transcript_text
+            # A Streamlit text_area only sends its value to the server on blur
+            # or Ctrl+Enter — never on the paste keystroke itself — so the
+            # security pre-check below would otherwise show stale results until
+            # the user happened to click away. This injects a one-time paste
+            # listener that blurs the box right after a paste, forcing Streamlit
+            # to commit the new text and rerun so the pre-check fires every time.
+            # (If this ever fails to load, Ctrl+Enter / clicking out still works.)
+            components.html(
+                """
+                <script>
+                const doc = window.parent.document;
+                doc.querySelectorAll('textarea').forEach((ta) => {
+                    if (ta.dataset.autocommit) return;
+                    ta.dataset.autocommit = '1';
+                    ta.addEventListener('paste', () => {
+                        setTimeout(() => ta.blur(), 50);
+                    });
+                });
+                </script>
+                """,
+                height=0,
+            )
             filename = st.text_input(
                 "filename",
                 value=st.session_state["paste_name"],
@@ -682,7 +705,16 @@ with tab1:
             unsafe_allow_html=True
         )
 
-        if run_btn and transcript_text:
+        # Re-check at execution time: the RUN click commits any not-yet-sent
+        # pasted text, so this catches injection that the button's disabled
+        # state (computed on the prior rerun) may have missed.
+        if run_btn and transcript_text and check_prompt_injection(transcript_text):
+            st.error(
+                "Prompt injection detected — pipeline blocked. "
+                "Remove the flagged text and try again."
+            )
+
+        if run_btn and transcript_text and not check_prompt_injection(transcript_text):
             clean_text, redacted = scrub_pii(transcript_text)
             if redacted:
                 st.markdown(
